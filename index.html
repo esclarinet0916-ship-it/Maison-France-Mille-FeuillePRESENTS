@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>あみだくじ｜当たり16本</title>
+<style>
+  :root{
+    --indigo:#131c31; --indigo-2:#1b2742; --line:#2a3a5f;
+    --washi:#f4ecdd; --washi-2:#ece0cb; --sumi:#26303f;
+    --shu:#d02b3a;           /* 朱色：当たり */
+    --shu-deep:#b21f2d;
+    --slate:#5f6b7e;         /* はずれ */
+    --gold:#c79a3f;
+    --ink-line:#7b8bab;
+    --cream:#f4ecdd;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP","Meiryo",sans-serif;
+    color:var(--cream);
+    background:
+      radial-gradient(120% 80% at 50% -10%, #223258 0%, var(--indigo) 55%, #0e1526 100%);
+    min-height:100dvh;
+    line-height:1.5;
+    padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .wrap{width:100%;max-width:560px;}
+
+  header{text-align:center;margin:6px 0 18px;}
+  .eyebrow{
+    font-size:12px;letter-spacing:.42em;color:var(--gold);
+    font-weight:700;padding-left:.42em;
+  }
+  h1{
+    font-family:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+    font-weight:600;margin:.14em 0 .12em;
+    font-size:clamp(34px,11vw,52px);letter-spacing:.14em;
+    text-shadow:0 2px 0 rgba(0,0,0,.25);
+  }
+  h1 .dot{color:var(--shu);}
+  .sub{font-size:13.5px;color:#c3ccdf;}
+  .sub b{color:var(--cream);}
+  .rule{
+    width:56px;height:3px;margin:12px auto 0;border-radius:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  }
+
+  .panel{
+    background:linear-gradient(180deg,var(--washi),var(--washi-2));
+    border-radius:16px;padding:16px 14px 14px;
+    box-shadow:0 12px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.4);
+    color:var(--sumi);
+  }
+  .panel-label{
+    font-size:12px;font-weight:800;letter-spacing:.18em;color:#8a5a2b;
+    display:flex;align-items:center;gap:8px;margin:0 2px 12px;
+  }
+  .panel-label::after{content:"";flex:1;height:1px;background:rgba(138,90,43,.28);}
+
+  /* 番号ピッカー */
+  .pick{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));
+    gap:8px;
+  }
+  .num{
+    appearance:none;border:1.5px solid #d9c9ad;background:#fbf6ec;
+    color:var(--sumi);font-weight:700;font-size:16px;
+    height:46px;border-radius:11px;cursor:pointer;
+    font-variant-numeric:tabular-nums;
+    transition:transform .08s, background .15s, border-color .15s, color .15s;
+    box-shadow:0 1px 0 rgba(0,0,0,.04);
+  }
+  .num:hover{border-color:var(--gold);}
+  .num:active{transform:translateY(1px) scale(.97);}
+  .num:focus-visible{outline:3px solid rgba(199,154,63,.6);outline-offset:2px;}
+  .num.done{background:#e9dec9;color:#a99a80;border-color:#e2d5bd;}
+  .num.done::after{content:"✓";font-size:11px;position:relative;top:-8px;left:2px;color:var(--slate);}
+  .num.active{background:var(--shu);border-color:var(--shu-deep);color:#fff;box-shadow:0 3px 10px rgba(208,43,58,.4);}
+
+  /* あみだ盤 */
+  .board{margin-top:14px;}
+  .ladder-wrap{
+    background:#fbf6ec;border-radius:12px;padding:10px 8px;
+    box-shadow:inset 0 0 0 1px rgba(138,90,43,.14), inset 0 2px 10px rgba(120,90,40,.06);
+  }
+  svg{display:block;width:100%;height:auto;}
+  .col{stroke:var(--ink-line);stroke-width:2;stroke-linecap:round;}
+  .rung{stroke:var(--ink-line);stroke-width:2;stroke-linecap:round;}
+  .cap{fill:#c9b48f;}
+  .cap.hit{fill:var(--shu);}
+  .cap.miss{fill:var(--slate);}
+  .startlbl{fill:#9b8153;font-size:13px;font-weight:700;text-anchor:middle;font-family:inherit;}
+  #trace{fill:none;stroke:var(--shu);stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;
+         filter:drop-shadow(0 1px 2px rgba(208,43,58,.35));}
+  #tip{fill:#fff;stroke:var(--shu);stroke-width:3;}
+
+  /* 結果スタンプ */
+  .result{margin-top:14px;min-height:0;text-align:center;}
+  .result.show{margin-top:16px;}
+  .banner{font-size:15px;color:#5a4a30;font-weight:700;opacity:0;transition:opacity .3s;}
+  .banner.show{opacity:1;}
+  .banner b{font-size:18px;}
+  .stamp-row{display:flex;justify-content:center;margin-top:10px;}
+  .stamp{
+    width:120px;height:120px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    transform:scale(.2) rotate(-18deg);opacity:0;
+  }
+  .stamp.pop{animation:stamp .5s cubic-bezier(.2,1.5,.4,1) forwards;}
+  @keyframes stamp{60%{transform:scale(1.08) rotate(4deg);opacity:1;}100%{transform:scale(1) rotate(-3deg);opacity:1;}}
+  .stamp.hit{
+    color:var(--shu);border:4px solid var(--shu);
+    box-shadow:0 0 0 5px #fbf6ec, 0 0 0 7px var(--shu), 0 10px 24px rgba(208,43,58,.35);
+    background:radial-gradient(circle at 50% 40%, #fff 60%, #fdeced);
+  }
+  .stamp.hit .big{font-size:52px;font-weight:700;line-height:1;letter-spacing:.05em;}
+  .stamp.hit .small{font-size:15px;font-weight:700;margin-top:3px;letter-spacing:.3em;padding-left:.3em;}
+  .stamp.miss{
+    color:var(--slate);border:4px dashed #aab2be;background:#f2f0ec;
+    box-shadow:0 8px 20px rgba(0,0,0,.12);
+  }
+  .stamp.miss .big{font-size:30px;font-weight:700;letter-spacing:.14em;padding-left:.14em;}
+  .ring{position:absolute;width:120px;height:120px;border-radius:50%;border:3px solid var(--shu);
+        opacity:0;pointer-events:none;}
+  .ring.go{animation:ring .7s ease-out .15s;}
+  @keyframes ring{0%{transform:scale(.9);opacity:.55;}100%{transform:scale(1.9);opacity:0;}}
+  .stamp-stage{position:relative;display:flex;align-items:center;justify-content:center;}
+
+  .actions{display:flex;gap:10px;justify-content:center;margin-top:16px;opacity:0;transition:opacity .3s;}
+  .actions.show{opacity:1;}
+  .btn{
+    appearance:none;border:0;cursor:pointer;font-weight:700;font-size:14px;
+    padding:11px 18px;border-radius:999px;font-family:inherit;
+  }
+  .btn.ghost{background:#e7dcc7;color:#6b5330;}
+  .btn.ghost:active{transform:translateY(1px);}
+  .btn:focus-visible{outline:3px solid rgba(199,154,63,.7);outline-offset:2px;}
+
+  .foot{margin-top:18px;text-align:center;font-size:11.5px;color:#8e99b0;line-height:1.7;}
+  .tally{font-size:12px;color:#9aa4ba;text-align:center;margin-top:10px;}
+  .tally b{color:var(--cream);}
+
+  @media (prefers-reduced-motion:reduce){
+    .stamp.pop{animation:none;transform:scale(1) rotate(-3deg);opacity:1;}
+    .ring.go{animation:none;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">32人・当たり16本</div>
+      <h1>あみだく<span class="dot">じ</span></h1>
+      <div class="sub">自分の<b>番号</b>をタップすると、道すじが下まで進みます。</div>
+      <div class="rule"></div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-label">番号をえらぶ</div>
+      <div class="pick" id="pick" role="group" aria-label="番号を選ぶ"></div>
+
+      <div class="board">
+        <div class="ladder-wrap">
+          <svg id="svg" viewBox="0 0 656 604" role="img" aria-label="あみだくじの盤面"></svg>
+        </div>
+      </div>
+
+      <div class="result" id="result" aria-live="polite">
+        <div class="banner" id="banner"></div>
+        <div class="stamp-row">
+          <div class="stamp-stage">
+            <div class="ring" id="ring"></div>
+            <div class="stamp" id="stamp"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions" id="actions">
+        <button class="btn ghost" id="reset" type="button">別の番号をためす</button>
+      </div>
+
+      <div class="tally" id="tally"></div>
+    </section>
+
+    <div class="foot">
+      同じリンクを全員で開けば、結果は全員共通で公平です（当たりはちょうど16本）。<br>
+      本番は「自分の番号を1回だけ」タップしてください。
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- 固定シードで全員同じ盤面（＝公平） ----
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var N=32, L=40, SEED=20260721;
+  var rnd=mulberry32(SEED);
+  var rungs=[];
+  for(var l=0;l<L;l++){
+    var row=new Array(N-1).fill(false), used=new Array(N).fill(false);
+    for(var i=0;i<N-1;i++){
+      if(!used[i]&&!used[i+1]&&rnd()<0.48){row[i]=true;used[i]=true;used[i+1]=true;}
+    }
+    rungs.push(row);
+  }
+  function traceEnd(start){
+    var col=start;
+    for(var l=0;l<L;l++){
+      if(col-1>=0 && rungs[l][col-1]) col-=1;
+      else if(col<=N-2 && rungs[l][col]) col+=1;
+    }
+    return col;
+  }
+  // 下端の当たり配置（16 当たり / 16 はずれ）
+  var bottom=[]; for(var b=0;b<16;b++)bottom.push(true); for(var b2=0;b2<16;b2++)bottom.push(false);
+  for(var s=bottom.length-1;s>0;s--){var j=Math.floor(rnd()*(s+1));var tmp=bottom[s];bottom[s]=bottom[j];bottom[j]=tmp;}
+
+  // ---- 座標 ----
+  var MX=20, TOP=30, GAP, ROW=13, BOT_PAD=30;
+  var W=656, H=604;
+  GAP=(W-MX*2)/(N-1);
+  var bottomY=TOP+L*ROW;
+  function colX(i){return MX+i*GAP;}
+
+  var SVG="http://www.w3.org/2000/svg";
+  var svg=document.getElementById("svg");
+  function el(t,a){var e=document.createElementNS(SVG,t);for(var k in a)e.setAttribute(k,a[k]);return e;}
+
+  // 縦線
+  for(var c=0;c<N;c++){
+    svg.appendChild(el("line",{class:"col",x1:colX(c),y1:TOP,x2:colX(c),y2:bottomY}));
+  }
+  // 横棒
+  for(var lv=0;lv<L;lv++){
+    for(var ii=0;ii<N-1;ii++){
+      if(rungs[lv][ii]){
+        var y=TOP+(lv+1)*ROW;
+        svg.appendChild(el("line",{class:"rung",x1:colX(ii),y1:y,x2:colX(ii+1),y2:y}));
+      }
+    }
+  }
+  // 下端キャップ（中立色。結果でだけ色づく）
+  var caps=[];
+  for(var d=0;d<N;d++){
+    var cap=el("circle",{class:"cap",cx:colX(d),cy:bottomY,r:5});
+    caps.push(cap); svg.appendChild(cap);
+  }
+  // 上端の番号ラベル（1始まり）
+  for(var t=0;t<N;t++){
+    var lb=el("text",{class:"startlbl",x:colX(t),y:TOP-9});
+    lb.textContent=(t+1); svg.appendChild(lb);
+  }
+  // トレース線＋先端ドット（最前面）
+  var trace=el("polyline",{id:"trace",points:""}); svg.appendChild(trace);
+  var tip=el("circle",{id:"tip",cx:colX(0),cy:TOP,r:6,visibility:"hidden"}); svg.appendChild(tip);
+
+  // ---- 経路の点列 ----
+  function pathPoints(start){
+    var pts=[[colX(start),TOP]]; var col=start;
+    for(var lv=0;lv<L;lv++){
+      var yN=TOP+(lv+1)*ROW, ncol=col;
+      if(col-1>=0 && rungs[lv][col-1]) ncol=col-1;
+      else if(col<=N-2 && rungs[lv][col]) ncol=col+1;
+      pts.push([colX(col),yN]);
+      if(ncol!==col) pts.push([colX(ncol),yN]);
+      col=ncol;
+    }
+    return {pts:pts,end:col};
+  }
+
+  // ---- UI要素 ----
+  var pick=document.getElementById("pick");
+  var banner=document.getElementById("banner");
+  var stamp=document.getElementById("stamp");
+  var ring=document.getElementById("ring");
+  var actions=document.getElementById("actions");
+  var tally=document.getElementById("tally");
+  var buttons=[];
+  var revealed={}; // このデバイスで確認済み
+  var animating=false, current=null;
+
+  for(var n=1;n<=N;n++){
+    (function(n){
+      var btn=document.createElement("button");
+      btn.className="num"; btn.type="button"; btn.textContent=n;
+      btn.setAttribute("aria-label",n+"番");
+      btn.addEventListener("click",function(){ choose(n-1,btn); });
+      buttons.push(btn); pick.appendChild(btn);
+    })(n);
+  }
+  updateTally();
+
+  function updateTally(){
+    var k=Object.keys(revealed).length;
+    tally.innerHTML='このデバイスで確認済み：<b>'+k+'</b> / 32';
+  }
+
+  function clearActive(){buttons.forEach(function(b){b.classList.remove("active");});}
+
+  function choose(idx,btn){
+    if(animating) return;
+    clearActive(); btn.classList.add("active");
+    current=idx;
+    // リセット表示
+    banner.classList.remove("show"); stamp.className="stamp"; ring.className="ring";
+    actions.classList.remove("show");
+    caps.forEach(function(c){c.classList.remove("hit","miss");});
+    var pp=pathPoints(idx);
+    animatePath(pp,btn);
+  }
+
+  function animatePath(pp,btn){
+    animating=true;
+    var pts=pp.pts;
+    // 累積距離
+    var segs=[],total=0;
+    for(var i=1;i<pts.length;i++){
+      var dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1];
+      var d=Math.hypot(dx,dy); segs.push(d); total+=d;
+    }
+    tip.setAttribute("visibility","visible");
+    var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+    var DUR=reduce?0:1450;
+    var t0=null;
+    function frame(ts){
+      if(t0===null)t0=ts;
+      var p=DUR===0?1:Math.min(1,(ts-t0)/DUR);
+      var e=1-Math.pow(1-p,2); // easeOutQuad
+      var dist=e*total, acc=0, k=0;
+      var drawn=[pts[0].slice()];
+      var tipXY=pts[pts.length-1];
+      for(var i=1;i<pts.length;i++){
+        if(acc+segs[i-1]>=dist){
+          var r=(dist-acc)/segs[i-1];
+          var x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*r;
+          var y=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*r;
+          drawn.push([x,y]); tipXY=[x,y]; break;
+        } else { drawn.push(pts[i].slice()); acc+=segs[i-1]; }
+      }
+      trace.setAttribute("points",drawn.map(function(q){return q[0]+","+q[1];}).join(" "));
+      tip.setAttribute("cx",tipXY[0]); tip.setAttribute("cy",tipXY[1]);
+      if(p<1){requestAnimationFrame(frame);}
+      else{ animating=false; reveal(pp.end,btn); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function reveal(end,btn){
+    var hit=bottom[end];
+    caps[end].classList.add(hit?"hit":"miss");
+    banner.innerHTML=(current+1)+'番は … <b>'+(hit?'当たり！':'はずれ')+'</b>';
+    banner.classList.add("show");
+    stamp.className="stamp "+(hit?"hit":"miss")+" pop";
+    stamp.innerHTML= hit
+      ? '<span class="big">当</span><span class="small">あたり</span>'
+      : '<span class="big">はずれ</span>';
+    if(hit){ ring.className="ring go"; }
+    actions.classList.add("show");
+    btn.classList.remove("active"); btn.classList.add("done");
+    if(!revealed[current]){revealed[current]=true; updateTally();}
+    if(navigator.vibrate){ navigator.vibrate(hit?[0,40,60,40]:30); }
+  }
+
+  document.getElementById("reset").addEventListener("click",function(){
+    if(animating) return;
+    clearActive();
+    trace.setAttribute("points","");
+    tip.setAttribute("visibility","hidden");
+    banner.classList.remove("show");
+    stamp.className="stamp"; ring.className="ring";
+    actions.classList.remove("show");
+    caps.forEach(function(c){c.classList.remove("hit","miss");});
+    current=null;
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+})();
+</script>
+</body>
+</html>
